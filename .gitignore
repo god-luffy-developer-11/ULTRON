@@ -1,0 +1,51 @@
+# Environment and Secrets (CRITICAL: Never commit API keys or tokens)
+.env
+*.env
+*.pem
+*.key
+credentials.json
+token.txt
+*token*
+
+# Virtual Environments & Caches
+.venv/
+.venv_jarvis/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Databases and Local Runtime State
+data/
+*.db
+*.sqlite
+*.sqlite3
+ultron_memory.json
+memory.json
+audit.jsonl
+*.xml
+
+# Media, Screen captures and Audio Logs
+*.mp3
+*.wav
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.ico
+captured_photos/
+recordings/
+screenshots/
+logs/
+*.log
+
+# Sub-repos & external clones
+jarvis_repo/

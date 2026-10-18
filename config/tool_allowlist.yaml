@@ -1,0 +1,62 @@
+version: "1.0"
+approved_apps:
+  - "notepad"
+  - "calc"
+  - "calculator"
+  - "chrome"
+  - "edge"
+  - "spotify"
+  - "code"
+  - "explorer"
+  - "taskmgr"
+
+approved_paths:
+  - "C:\\Users\\surya\\Downloads\\ULTRON"
+  - "C:\\Users\\surya\\Desktop"
+  - "C:\\Users\\surya\\Downloads"
+  - "C:\\Users\\surya\\Documents"
+
+tools:
+  system.get_status:
+    risk: "R0"
+    allowed_devices: ["windows-primary", "android-companion"]
+  apps.open:
+    risk: "R1"
+    allowed_devices: ["windows-primary", "android-companion"]
+  files.list:
+    risk: "R0"
+    allowed_devices: ["windows-primary"]
+  files.read:
+    risk: "R0"
+    allowed_devices: ["windows-primary"]
+  files.edit:
+    risk: "R2"
+    allowed_devices: ["windows-primary"]
+  browser.search:
+    risk: "R0"
+    allowed_devices: ["windows-primary", "android-companion"]
+  browser.navigate:
+    risk: "R1"
+    allowed_devices: ["windows-primary"]
+  screen.capture:
+    risk: "R2"
+    allowed_devices: ["windows-primary"]
+  voice.speak:
+    risk: "R1"
+    allowed_devices: ["windows-primary", "android-companion"]
+  messages.prepare:
+    risk: "R1"
+    allowed_devices: ["windows-primary", "android-companion"]
+  messages.send:
+    risk: "R3"
+    allowed_devices: ["android-companion"]
+  jobs.create:
+    risk: "R2"
+    allowed_devices: ["windows-primary", "android-companion"]
+  home.device_control:
+    risk: "R2"
+    allowed_devices: ["windows-primary", "android-companion"]
+  system.command:
+    risk: "R3"
+    allowed_devices: ["windows-primary"]
+    enabled: false # Disabled by default as per spec

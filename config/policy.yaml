@@ -1,0 +1,34 @@
+version: "1.0"
+autonomy_mode: "balanced" # Options: readonly, balanced, autonomous
+default_timeout_seconds: 15
+
+tiers:
+  R0:
+    name: "Read-only"
+    policy: "automatic_within_scope"
+    description: "Time, system status, approved project file listing, public web search"
+  R1:
+    name: "Routine"
+    policy: "automatic_if_allowlisted"
+    description: "Open allowlisted app, run saved read-only workflow, speak response"
+  R2:
+    name: "Significant"
+    policy: "preview_and_confirm"
+    description: "Edit files, install packages, screen capture, read notifications"
+  R3:
+    name: "High impact"
+    policy: "action_specific_confirmation"
+    description: "Send messages, delete data, publish, security changes"
+  R4:
+    name: "Prohibited"
+    policy: "always_deny"
+    description: "Bypass security controls, credential theft, covert recording"
+
+audit:
+  retention_days: 90
+  redact_keys:
+    - "api_key"
+    - "password"
+    - "token"
+    - "secret"
+    - "authorization"
