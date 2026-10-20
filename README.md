@@ -79,19 +79,19 @@ Output:
 - Health: `http://127.0.0.1:8000/health`
 - Audit Trail: `http://127.0.0.1:8000/audit`
 
-### 2. Launch ULTRON Holographic 3D Orb UI (Sagar Builds)
-```powershell
-.\run_ultron_ui.bat
-```
-- Iron Man-inspired 3D holographic wireframe particle orb (`Three.js`)
-- MediaPipe hand tracking via webcam (`G` to toggle gestures, pinch to spin/zoom)
-- Live telemetry badges (Backend online, PC CPU/RAM, Android status)
-- Emergency Stop button and interactive command console
-
-### 3. Launch ULTRON Voice & Autonomous Assistant
+### 2. Launch ULTRON Voice & Autonomous Assistant (Console Mode)
 ```powershell
 .\run_ultron.bat
 ```
 - Personalized for **Luffy**
 - Wake Trigger: **Double Clap** or wake word
 - Bilingual: English & Tamil (`base` Whisper + ElevenLabs / Edge-TTS)
+
+### 3. Launch ULTRON Holographic 3D Desktop Operator (Native Iron Man UI)
+```powershell
+.\run_ultron_desktop.bat
+```
+- **Native Desktop Application**: Runs directly as a dedicated Windows window (not a web browser).
+- **Holographic 3D Orb**: High-fidelity Three.js core spiral, wireframe shells, bloom shaders, and orbiting particles ported from Sagar's design.
+- **Bi-directional Bridge**: Connected via `QWebChannel` to Gemini reasoning, continuous Whisper ear listener, Edge/ElevenLabs speech, and real device tools (`apps.*`, `files.*`, `android.*`, `workflow.*`).
+- **Interactive HUD**: Live telemetry badges (PC CPU/RAM, Android ADB status, Gemini status), operator transcript terminal, quick command dock, and emergency STOP control.

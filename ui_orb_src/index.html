@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ULTRON — Holographic AI Operator</title>
+  <script src="./qwebchannel.js"></script>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <!-- 3D Holographic Three.js Canvas Container -->
+  <div id="orb-root" class="orb-root"></div>
+
+  <!-- Holographic Overlays -->
+  <div class="overlay-vignette"></div>
+  <div class="overlay-grain"></div>
+  <div class="overlay-scanlines"></div>
+
+  <!-- HUD: Top Header -->
+  <header class="hud hud-top">
+    <div class="hud-brand">
+      <div class="brand-title">U.L.T.R.O.N.</div>
+      <div class="brand-sub">AUTONOMOUS OPERATOR // MK-VI</div>
+    </div>
+
+    <!-- Telemetry status badges -->
+    <div class="hud-telemetry">
+      <span id="pill-pc" class="telemetry-pill">PC: CPU 0% · RAM 0%</span>
+      <span id="pill-phone" class="telemetry-pill">PHONE: CONNECTED</span>
+      <span id="pill-brain" class="telemetry-pill">GEMINI 3.8 ONLINE</span>
+      <span id="state-badge" class="status-pill state-standby">STANDBY</span>
+      <button id="btn-stop" class="hud-btn btn-danger" title="Immediate Emergency Stop">■ STOP</button>
+    </div>
+  </header>
+
+  <!-- HUD: Interaction Hint -->
+  <div class="hud hud-hint">
+    <div><span class="key">DRAG</span> SPIN&nbsp;&nbsp;<span class="key">SCROLL</span> ZOOM&nbsp;&nbsp;<span class="key">R</span> RESET</div>
+    <div><span class="key">SPACE</span> TOGGLE VOICE&nbsp;&nbsp;<span class="key">+ / -</span> ZOOM</div>
+  </div>
+
+  <!-- HUD: Camera & View Controls -->
+  <div class="hud hud-controls">
+    <div class="hud-row">
+      <button type="button" id="btn-zoom-in" class="hud-btn" aria-label="Zoom in">+</button>
+      <button type="button" id="btn-zoom-out" class="hud-btn" aria-label="Zoom out">−</button>
+      <button type="button" id="btn-reset" class="hud-btn">RESET</button>
+    </div>
+  </div>
+
+  <!-- HUD: Left Activity & Execution Terminal -->
+  <aside class="hud hud-terminal-container">
+    <div class="terminal-header">
+      <span>// TELEMETRY &amp; OPERATOR TRANSCRIPT</span>
+      <span class="terminal-pulse">● LIVE</span>
+    </div>
+    <div id="hud-terminal" class="terminal-body">
+      <div class="log-row log-system">
+        <span class="log-time">[SYSTEM]</span>
+        <span class="log-msg">Ultron holographic operating system initialized. Ready for instructions, Luffy.</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- HUD: Bottom Command & Control Dock -->
+  <footer class="hud hud-bottom-dock">
+    <div class="quick-pills">
+      <button type="button" class="quick-pill" data-cmd="open notepad and write essay about AI in 100 words">Open Notepad &amp; Write Essay</button>
+      <button type="button" class="quick-pill" data-cmd="check both devices and tell me what is running">Check Both Devices</button>
+      <button type="button" class="quick-pill" data-cmd="organize my Downloads folder by file type">Organize Downloads</button>
+      <button type="button" class="quick-pill" data-cmd="open clock and add alarm at 5:30am in my phone">Phone: Set Alarm 5:30 AM</button>
+      <button type="button" class="quick-pill" data-cmd="open whatsapp and send hi message to rudra in my phone">Phone: WhatsApp Rudra</button>
+    </div>
+
+    <form id="command-form" class="command-box">
+      <button type="button" id="btn-mic" class="mic-btn" title="Toggle Voice Recognition">
+        <span class="mic-icon">🎙</span>
+      </button>
+      <input
+        type="text"
+        id="command-input"
+        class="command-input"
+        placeholder="Ultron, open notepad and write an essay, control PC, or execute mobile tasks..."
+        autocomplete="off"
+      />
+      <button type="submit" class="hud-btn btn-primary">EXECUTE</button>
+    </form>
+  </footer>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

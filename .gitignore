@@ -8,9 +8,6 @@ token.txt
 *token*
 
 # Virtual Environments & Caches
-node_modules/
-.next/
-out/
 .venv/
 .venv_jarvis/
 venv/
@@ -22,8 +19,8 @@ __pycache__/
 .coverage
 htmlcov/
 *.egg-info/
-dist/
-build/
+/dist/
+/build/
 
 # Databases and Local Runtime State
 data/
@@ -52,3 +49,11 @@ logs/
 
 # Sub-repos & external clones
 jarvis_repo/
+node_modules/
+**/node_modules/
+.next/
+**/out/
+*.tmp
+check_*.py
+test_desktop_integration.py
+
