@@ -77,10 +77,62 @@ export class HandTracker {
   }
 
   async start(): Promise<void> {
-    this.stream = await navigator.mediaDevices.getUserMedia({
+    const isVirtualOrPhone = (label: string) => {
+      const l = (label || "").toLowerCase();
+      return (
+        l.includes("phone link") ||
+        l.includes("link to windows") ||
+        l.includes("virtual") ||
+        l.includes("droidcam") ||
+        l.includes("obs") ||
+        l.includes("iriun") ||
+        l.includes("epoccam") ||
+        l.includes("ip camera")
+      );
+    };
+
+    // 1. Initial media stream request (triggers browser permission if needed)
+    let activeStream = await navigator.mediaDevices.getUserMedia({
       video: { width: 640, height: 480, facingMode: "user" },
       audio: false,
     });
+
+    const activeTrack = activeStream.getVideoTracks()[0];
+    const activeLabel = (activeTrack?.label || "").toLowerCase();
+    console.log("[HandTracker] Default camera opened:", activeLabel);
+
+    // 2. If Windows defaulted to Phone Link or a virtual camera, switch to PC physical webcam
+    if (isVirtualOrPhone(activeLabel)) {
+      console.log("[HandTracker] Detected Phone Link or virtual camera. Searching for physical PC webcam...");
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d) => d.kind === "videoinput");
+        console.log("[HandTracker] Available cameras:", videoDevices.map((d) => d.label));
+
+        // Prioritize physical/integrated/USB webcam
+        const physicalCam = videoDevices.find((d) => {
+          const l = (d.label || "").toLowerCase();
+          return !isVirtualOrPhone(l);
+        });
+
+        if (physicalCam && physicalCam.deviceId) {
+          console.log("[HandTracker] Switching to PC webcam:", physicalCam.label);
+          activeTrack.stop();
+          activeStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: { exact: physicalCam.deviceId },
+              width: 640,
+              height: 480,
+            },
+            audio: false,
+          });
+        }
+      } catch (enumErr) {
+        console.warn("[HandTracker] Failed to switch camera:", enumErr);
+      }
+    }
+
+    this.stream = activeStream;
     this.video.srcObject = this.stream;
     await this.video.play();
 
@@ -138,83 +190,138 @@ export class HandTracker {
   };
 
   private processHands(
-    landmarks: NormalizedLandmark[][],
+    landmarksList: NormalizedLandmark[][],
     labels: string[],
   ): void {
-    const pinchedGrabs: Point[] = [];
-    const seen = new Set<string>();
+    const handsCount = landmarksList.length;
 
-    landmarks.forEach((lm, i) => {
-      const label = labels[i];
-      seen.add(label);
+    // Update each detected hand's pinch + grab state
+    const currentHands: Array<{ label: string; state: HandState }> = [];
+    for (let i = 0; i < handsCount; i++) {
+      const lm = landmarksList[i];
+      // Fall back to index if labels collide
+      const label = labels[i] && !currentHands.some((h) => h.label === labels[i])
+        ? labels[i]
+        : `Hand_${i}`;
 
-      const handScale = dist2d(lm[WRIST], lm[MIDDLE_MCP]);
-      if (handScale < 1e-6) return;
-      const pinchRatio = dist2d(lm[THUMB_TIP], lm[INDEX_TIP]) / handScale;
+      const thumb = lm[THUMB_TIP];
+      const index = lm[INDEX_TIP];
+      const wrist = lm[WRIST];
+      const middleMcp = lm[MIDDLE_MCP];
 
-      // Mirrored so hand-right = screen-right from the user's perspective
-      const raw: Point = {
-        x: 1 - (lm[THUMB_TIP].x + lm[INDEX_TIP].x) / 2,
-        y: (lm[THUMB_TIP].y + lm[INDEX_TIP].y) / 2,
-      };
+      // Scale: wrist to middle MCP knuckle distance
+      const handScale = Math.hypot(middleMcp.x - wrist.x, middleMcp.y - wrist.y) || 0.1;
+      const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y) / handScale;
 
-      let state = this.handStates.get(label);
-      if (!state) {
-        state = { pinching: false, grab: raw };
-        this.handStates.set(label, state);
-      }
+      const prev = this.handStates.get(label);
+      const wasPinching = prev?.pinching ?? false;
+      const pinching = wasPinching ? pinchDist < PINCH_OFF : pinchDist < PINCH_ON;
 
-      // Hysteresis so the pinch doesn't flicker on/off at the threshold
-      if (state.pinching && pinchRatio > PINCH_OFF) state.pinching = false;
-      else if (!state.pinching && pinchRatio < PINCH_ON) state.pinching = true;
+      // Raw midpoint, mirrored in X so it matches user's perspective
+      const rawX = 1 - (thumb.x + index.x) * 0.5;
+      const rawY = (thumb.y + index.y) * 0.5;
 
-      state.grab = {
-        x: state.grab.x + (raw.x - state.grab.x) * SMOOTHING,
-        y: state.grab.y + (raw.y - state.grab.y) * SMOOTHING,
-      };
+      const grab: Point = prev
+        ? {
+            x: prev.grab.x + (rawX - prev.grab.x) * SMOOTHING,
+            y: prev.grab.y + (rawY - prev.grab.y) * SMOOTHING,
+          }
+        : { x: rawX, y: rawY };
 
-      if (state.pinching) pinchedGrabs.push(state.grab);
-    });
-
-    // Drop state for hands that left the frame
-    for (const key of this.handStates.keys()) {
-      if (!seen.has(key)) this.handStates.delete(key);
+      const state: HandState = { pinching, grab };
+      this.handStates.set(label, state);
+      currentHands.push({ label, state });
     }
 
-    const mode: GestureMode =
-      pinchedGrabs.length >= 2 ? "zoom" : pinchedGrabs.length === 1 ? "spin" : "idle";
-
-    // Reset reference points on any mode change to avoid jumps
-    if (mode !== this.prevMode) {
-      this.prevSpinGrab = null;
-      this.prevZoomDist = null;
-      this.prevMode = mode;
+    // Drop states for hands no longer present
+    for (const key of Array.from(this.handStates.keys())) {
+      if (!currentHands.some((h) => h.label === key)) {
+        this.handStates.delete(key);
+      }
     }
 
-    if (mode === "spin") {
-      const grab = pinchedGrabs[0];
-      if (this.prevSpinGrab) {
-        const dx = grab.x - this.prevSpinGrab.x;
-        const dy = grab.y - this.prevSpinGrab.y;
-        if (Math.abs(dx) > 1e-4 || Math.abs(dy) > 1e-4) {
-          this.callbacks.onRotate(dx * ROTATE_SPEED, dy * ROTATE_SPEED);
-        }
-      }
-      this.prevSpinGrab = grab;
-    } else if (mode === "zoom") {
-      const d = Math.hypot(
-        pinchedGrabs[0].x - pinchedGrabs[1].x,
-        pinchedGrabs[0].y - pinchedGrabs[1].y,
-      );
-      if (this.prevZoomDist && d > 1e-4) {
-        // Spread hands apart -> factor < 1 -> camera moves closer
-        const factor = Math.min(1.18, Math.max(0.85, this.prevZoomDist / d));
+    const pinchingHands = currentHands.filter((h) => h.state.pinching);
+
+    // ——— TWO HANDS PINCHING -> ZOOM ———
+    if (pinchingHands.length >= 2) {
+      const p1 = pinchingHands[0].state.grab;
+      const p2 = pinchingHands[1].state.grab;
+      const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
+      if (this.prevMode === "zoom" && this.prevZoomDist !== null && this.prevZoomDist > 0.01) {
+        // Distance ratio: if hands move apart, dist/prevDist > 1 -> zoom in
+        // In our API zoomBy(factor): factor < 1 zooms in (reduces camera distance)
+        const ratio = dist / this.prevZoomDist;
+        // Dampen the ratio to keep zoom smooth
+        const factor = Math.exp(-(ratio - 1) * 1.5);
         this.callbacks.onZoom(factor);
       }
-      this.prevZoomDist = d;
+      this.prevZoomDist = dist;
+      this.prevSpinGrab = null;
+      this.prevMode = "zoom";
+      this.emitStatus({ hands: handsCount, mode: "zoom" });
+      return;
     }
 
-    this.emitStatus({ hands: landmarks.length, mode });
+    // ——— ONE HAND PINCHING -> SPIN ———
+    if (pinchingHands.length === 1) {
+      const grab = pinchingHands[0].state.grab;
+
+      if (this.prevMode === "spin" && this.prevSpinGrab) {
+        const dx = grab.x - this.prevSpinGrab.x;
+        const dy = grab.y - this.prevSpinGrab.y;
+        this.callbacks.onRotate(dx * ROTATE_SPEED, dy * ROTATE_SPEED);
+      }
+      this.prevSpinGrab = grab;
+      this.prevZoomDist = null;
+      this.prevMode = "spin";
+      this.emitStatus({ hands: handsCount, mode: "spin" });
+      return;
+    }
+
+    // ——— IDLE ———
+    this.prevSpinGrab = null;
+    this.prevZoomDist = null;
+    this.prevMode = "idle";
+    this.emitStatus({ hands: handsCount, mode: "idle" });
+  }
+
+  private drawOverlay(landmarksList: NormalizedLandmark[][]): void {
+    const ctx = this.overlay.getContext("2d");
+    if (!ctx) return;
+    const w = this.overlay.width;
+    const h = this.overlay.height;
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.save();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(255, 170, 48, 0.4)";
+    ctx.fillStyle = "#ffaa30";
+
+    for (const lm of landmarksList) {
+      for (const pt of lm) {
+        // Mirrored in X to match video mirror
+        const x = (1 - pt.x) * w;
+        const y = pt.y * h;
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw pinch indicator
+      const thumb = lm[THUMB_TIP];
+      const index = lm[INDEX_TIP];
+      const tx = (1 - thumb.x) * w;
+      const ty = thumb.y * h;
+      const ix = (1 - index.x) * w;
+      const iy = index.y * h;
+
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(ix, iy);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   private emitStatus(status: TrackerStatus): void {
@@ -226,46 +333,4 @@ export class HandTracker {
       this.callbacks.onStatus(status);
     }
   }
-
-  private drawOverlay(landmarks: NormalizedLandmark[][]): void {
-    const ctx = this.overlay.getContext("2d");
-    if (!ctx) return;
-    const { width, height } = this.overlay;
-    ctx.clearRect(0, 0, width, height);
-
-    for (const lm of landmarks) {
-      const thumb = lm[THUMB_TIP];
-      const index = lm[INDEX_TIP];
-      // Overlay canvas sits on the mirrored video preview, so mirror x here too
-      const tx = (1 - thumb.x) * width;
-      const ty = thumb.y * height;
-      const ix = (1 - index.x) * width;
-      const iy = index.y * height;
-
-      const handScale = dist2d(lm[WRIST], lm[MIDDLE_MCP]);
-      const pinched =
-        handScale > 1e-6 && dist2d(thumb, index) / handScale < PINCH_ON;
-
-      ctx.strokeStyle = pinched ? "#ffcc66" : "rgba(255,170,48,0.5)";
-      ctx.lineWidth = pinched ? 2 : 1;
-      ctx.beginPath();
-      ctx.moveTo(tx, ty);
-      ctx.lineTo(ix, iy);
-      ctx.stroke();
-
-      ctx.fillStyle = pinched ? "#ffcc66" : "rgba(255,170,48,0.7)";
-      for (const [x, y] of [
-        [tx, ty],
-        [ix, iy],
-      ]) {
-        ctx.beginPath();
-        ctx.arc(x, y, pinched ? 5 : 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-}
-
-function dist2d(a: NormalizedLandmark, b: NormalizedLandmark): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }

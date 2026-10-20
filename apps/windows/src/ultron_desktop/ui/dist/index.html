@@ -5,12 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ULTRON — Holographic AI Operator</title>
   <script src="./qwebchannel.js"></script>
-  <script type="module" crossorigin src="./assets/index-BRu_2Gqx.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-6UFG4yBf.css">
+  <script type="module" crossorigin src="./assets/index-DFvUiUCB.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DOddqg-z.css">
 </head>
 <body>
   <!-- 3D Holographic Three.js Canvas Container -->
   <div id="orb-root" class="orb-root"></div>
+
+  <!-- Off-screen elements for MediaPipe Hand Tracking (silent background execution without any UI box) -->
+  <div class="offscreen-media" aria-hidden="true">
+    <video id="camera-video" muted playsinline></video>
+    <canvas id="camera-overlay" width="640" height="480"></canvas>
+  </div>
 
   <!-- Holographic Overlays -->
   <div class="overlay-vignette"></div>
@@ -40,15 +46,8 @@
     <div><span class="key">SPACE</span> TOGGLE VOICE&nbsp;&nbsp;<span class="key">R</span> RESET&nbsp;&nbsp;<span class="key">+ / -</span> ZOOM</div>
   </div>
 
-  <!-- HUD: Camera & View Controls with Real-time MediaPipe Hand Tracking -->
+  <!-- HUD: Camera & View Controls -->
   <div class="hud hud-controls">
-    <div id="camera-panel" class="camera-panel">
-      <video id="camera-video" muted playsinline class="camera-video"></video>
-      <canvas id="camera-overlay" width="208" height="156" class="camera-overlay"></canvas>
-      <div id="camera-status" class="camera-status">SHOW HANDS</div>
-    </div>
-    <div id="hud-error" class="hud-error" style="display: none;"></div>
-
     <div class="hud-row">
       <button type="button" id="btn-gestures" class="hud-btn" aria-pressed="false">GESTURES OFF</button>
     </div>

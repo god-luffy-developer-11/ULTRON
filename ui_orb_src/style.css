@@ -9,6 +9,18 @@
   --border-glow: rgba(255, 170, 48, 0.65);
 }
 
+/* Off-screen media elements for background hand tracking without any UI box */
+.offscreen-media {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0.001;
+  pointer-events: none;
+  z-index: -999;
+}
+
 /* --- HUD Top Header --- */
 .hud-top {
   top: 16px;
@@ -95,56 +107,6 @@
   background: rgba(80, 10, 10, 0.7) !important;
   border-color: #ff6666 !important;
   box-shadow: 0 0 14px rgba(255, 50, 50, 0.5) !important;
-}
-
-/* --- Camera Panel & MediaPipe Overlays --- */
-.camera-panel {
-  position: relative;
-  width: 208px;
-  height: 156px;
-  border: 1px solid rgba(255, 170, 48, 0.45);
-  border-radius: 4px;
-  overflow: hidden;
-  background: #000;
-  display: none;
-  box-shadow: 0 0 16px rgba(255, 140, 20, 0.2);
-}
-
-.camera-panel.visible {
-  display: block;
-}
-
-.camera-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
-}
-
-.camera-overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.camera-status {
-  position: absolute;
-  bottom: 4px;
-  left: 6px;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: #ffaa30;
-  text-shadow: 0 0 6px rgba(255, 170, 48, 0.8);
-  pointer-events: none;
-}
-
-.hud-error {
-  font-size: 11px;
-  color: #ff4444;
-  letter-spacing: 0.08em;
-  text-shadow: 0 0 6px rgba(255, 60, 60, 0.8);
 }
 
 /* --- Holographic Notification Toast --- */

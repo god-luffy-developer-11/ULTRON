@@ -12,12 +12,6 @@ let tracker: HandTracker | null = null;
 let cameraActive = false;
 const pendingCommands: string[] = [];
 
-const MODE_LABEL: Record<TrackerStatus["mode"], string> = {
-  idle: "STANDBY",
-  spin: "SPIN",
-  zoom: "ZOOM",
-};
-
 // Initialize 3D Holographic Orb
 window.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("orb-root");
@@ -112,51 +106,44 @@ window.addEventListener("DOMContentLoaded", () => {
 
 async function toggleHandGestures() {
   const gesturesBtn = document.getElementById("btn-gestures") as HTMLButtonElement;
-  const cameraPanel = document.getElementById("camera-panel");
   const video = document.getElementById("camera-video") as HTMLVideoElement;
   const overlay = document.getElementById("camera-overlay") as HTMLCanvasElement;
-  const statusEl = document.getElementById("camera-status");
-  const errorEl = document.getElementById("hud-error");
 
   if (cameraActive) {
-    // Stop tracking
     tracker?.stop();
     tracker = null;
     cameraActive = false;
-    cameraPanel?.classList.remove("visible");
     if (gesturesBtn) {
       gesturesBtn.textContent = "GESTURES OFF";
       gesturesBtn.setAttribute("aria-pressed", "false");
     }
+    setStatus("STANDBY");
     showToast("Hand tracking stopped");
   } else {
-    // Start tracking
     if (!video || !overlay) return;
-    if (gesturesBtn) gesturesBtn.textContent = "INITIALIZING…";
-    if (errorEl) errorEl.style.display = "none";
+    if (gesturesBtn) gesturesBtn.textContent = "CONNECTING CAM…";
 
     try {
       tracker = new HandTracker(video, overlay, {
         onRotate: (dt, dp) => sceneApi?.rotateBy(dt, dp),
         onZoom: (factor) => sceneApi?.zoomBy(factor),
         onStatus: (st) => {
-          if (statusEl) {
-            statusEl.textContent =
-              st.hands > 0
-                ? `${st.hands} HAND${st.hands > 1 ? "S" : ""} · ${MODE_LABEL[st.mode]}`
-                : "SHOW HANDS";
+          if (st.mode !== "idle") {
+            setStatus(st.mode === "spin" ? "SPINNING" : "ZOOMING");
+          } else {
+            setStatus("GESTURES ON");
           }
         },
       });
 
       await tracker.start();
       cameraActive = true;
-      cameraPanel?.classList.add("visible");
       if (gesturesBtn) {
         gesturesBtn.textContent = "GESTURES ON";
         gesturesBtn.setAttribute("aria-pressed", "true");
       }
-      showToast("Hand tracking active: Pinch to rotate / spread to zoom");
+      setStatus("GESTURES ON");
+      showToast("PC Default Camera Active: Pinch & Move to control Orb");
     } catch (err: any) {
       console.error("[Ultron Hand Tracking] Failed to start:", err);
       tracker = null;
@@ -165,17 +152,7 @@ async function toggleHandGestures() {
         gesturesBtn.textContent = "GESTURES OFF";
         gesturesBtn.setAttribute("aria-pressed", "false");
       }
-      if (errorEl) {
-        errorEl.textContent =
-          err?.name === "NotAllowedError"
-            ? "CAMERA ACCESS DENIED"
-            : "CAMERA INIT FAILED";
-        errorEl.style.display = "block";
-        setTimeout(() => {
-          errorEl.style.display = "none";
-        }, 4000);
-      }
-      showToast("Webcam error. Enable camera permission.");
+      showToast(err?.name === "NotAllowedError" ? "Camera access denied" : "PC Camera not found");
     }
   }
 }
@@ -218,7 +195,7 @@ function setStatus(state: string) {
   const badge = document.getElementById("state-badge");
   if (badge) {
     badge.textContent = state;
-    badge.className = `status-pill state-${state.toLowerCase()}`;
+    badge.className = `status-pill state-${state.toLowerCase().replace(/\s+/g, "-")}`;
   }
 }
 
@@ -247,7 +224,9 @@ function initWebChannel() {
       });
 
       ultronBridge.state_changed.connect((state: string) => {
-        setStatus(state);
+        if (!cameraActive || state === "THINKING" || state === "LISTENING") {
+          setStatus(state);
+        }
       });
 
       ultronBridge.device_status_updated.connect((pc: string, phone: string, brain: string) => {
