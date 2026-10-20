@@ -4,15 +4,10 @@ cd /d "%~dp0"
 chcp 65001 > nul
 set PYTHONIOENCODING=utf-8
 
-echo =========================================================================
-echo  ULTRON - Autonomous AI Operator (Holographic 3D UI + Voice Engine)
-echo  Owner: Luffy - English ^& Tamil - PC ^& Mobile Control
-echo =========================================================================
+echo ==========================================================
+echo Starting ULTRON - Personal Autonomous Voice Assistant
+echo User: Luffy - Languages: English and Tamil - Continuous Listening
+echo ==========================================================
 
-"%~dp0.venv\Scripts\python.exe" apps\windows\src\ultron_desktop\app.py
-if errorlevel 1 (
-    echo.
-    echo ULTRON terminated with an error. Falling back to console mode...
-    "%~dp0.venv\Scripts\python.exe" main.py
-)
+"%~dp0.venv\Scripts\python.exe" main.py
 pause
