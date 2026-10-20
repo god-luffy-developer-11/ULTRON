@@ -131,6 +131,9 @@ class UltronDesktopWindow(QMainWindow):
         self.channel.registerObject("ultronBridge", self.bridge)
         self.page.setWebChannel(self.channel)
 
+        # Grant webcam and audio permissions for hand tracking
+        self.page.featurePermissionRequested.connect(self._handle_permission_request)
+
         self.setCentralWidget(self.view)
 
         # Load UI
@@ -151,6 +154,15 @@ class UltronDesktopWindow(QMainWindow):
         self.telemetry_timer = QTimer(self)
         self.telemetry_timer.timeout.connect(self._push_telemetry)
         self.telemetry_timer.start(3000)
+
+    def _handle_permission_request(self, security_origin, feature):
+        """Auto-grant webcam permission for MediaPipe 3D Orb hand gesture control."""
+        print(f"[Desktop WebEngine] Auto-granting permission {feature} to {security_origin}")
+        self.page.setFeaturePermission(
+            security_origin,
+            feature,
+            QWebEnginePage.PermissionPolicy.PermissionGrantedByUser
+        )
 
     def _start_voice_monitor(self):
         """Starts ear listener in background thread."""

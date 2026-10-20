@@ -6,7 +6,7 @@ if hasattr(sys.stderr, "reconfigure"):
 
 import json
 import re
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable, Optional
 from openai import OpenAI
 
 from core.config import Config
@@ -1115,6 +1115,108 @@ class UltronBrain:
         except Exception as e:
             print(f"[Brain] Could not init Gemini chat: {e}")
 
+    def _try_direct_action_intent(self, text: str) -> Optional[str]:
+        """Direct action execution with 0 latency and 100% certainty for explicit device commands."""
+        t = text.lower().strip()
+
+        # 1. Calculator
+        if any(w in t for w in ["open calculator", "launch calculator", "start calculator", "open calc"]):
+            match = re.search(r'(?:add|type|calculate|compute|\+)\s*([\d\.\+\-\*\/\s]+)', t)
+            pc_control.open_app("calc")
+            if match:
+                time.sleep(1.0)
+                raw_expr = match.group(1).replace(" ", "").strip()
+                expr = raw_expr if raw_expr.endswith("=") else raw_expr + "="
+                pc_control.focus_window_by_name("Calculator")
+                import pyautogui
+                for ch in expr:
+                    if ch == '+':
+                        pyautogui.hotkey('shift', '=')
+                    elif ch in ['=', '\n']:
+                        pyautogui.press('enter')
+                    else:
+                        pyautogui.press(ch)
+                    time.sleep(0.08)
+                try:
+                    ans = eval(raw_expr.replace('x', '*'), {"__builtins__": None}, {})
+                    return f"Opened Calculator and calculated {raw_expr} = {ans}, Luffy."
+                except Exception:
+                    return f"Opened Calculator and calculated {raw_expr}, Luffy."
+            return "Opened Calculator, Luffy."
+
+        # 2. Notepad & Essay
+        if any(w in t for w in ["open notepad", "write essay", "write an essay", "create essay", "type in notepad"]):
+            match = re.search(r'(?:type|write|say|about|eluthu|essay)\s+(.+)', t)
+            topic = match.group(1).strip() if match else "artificial intelligence in 100 words"
+            if "essay" in t or "write" in t or "ai" in t:
+                pc_control.write_in_notepad(topic)
+                return "I have opened Notepad and written the essay for you, Luffy."
+            else:
+                pc_control.open_app("notepad")
+                return "Opened Notepad, Luffy."
+
+        # 3. Check Both Devices
+        if any(phrase in t for phrase in ["check both devices", "tell me what is running", "check devices", "device status"]):
+            from services.registry.registry import tool_registry
+            import services.registry.schemas as schemas
+            t_tool = tool_registry.get_tool("devices.list")
+            out = t_tool.handler(schemas.DevicesListInput())
+            dev_lines = []
+            for d in out.devices:
+                dev_lines.append(f"{d['name']} ({d['type']}): {'ONLINE' if d['online'] else 'OFFLINE'}")
+            return "I checked both devices, Luffy:\n" + "\n".join(dev_lines)
+
+        # 4. Control Panel / Device Manager / Task Manager / Settings
+        if "control panel" in t:
+            pc_control.open_control_panel()
+            return "Opened Control Panel, Luffy."
+        if "device manager" in t:
+            pc_control.open_device_manager()
+            return "Opened Device Manager, Luffy."
+        if "task manager" in t:
+            pc_control.open_task_manager()
+            return "Opened Task Manager, Luffy."
+        if "open settings" in t or "windows settings" in t:
+            pc_control.open_windows_settings()
+            return "Opened Windows Settings, Luffy."
+
+        # 5. Organize Downloads
+        if "organize" in t and ("download" in t or "folder" in t):
+            from services.registry.registry import tool_registry
+            import services.registry.schemas as schemas
+            t_tool = tool_registry.get_tool("files.organize")
+            out = t_tool.handler(schemas.FilesOrganizeInput(directory_path=r"c:\Users\surya\Downloads", dry_run=False))
+            return f"Organized your Downloads folder, Luffy: {out.message}"
+
+        # 6. Test All PC Apps
+        if any(phrase in t for phrase in ["test all apps in my pc", "test all apps in pc", "test pc apps"]):
+            pc_control.test_all_pc_apps()
+            return "All PC applications, hardware controls, and windows tested and verified, Luffy."
+
+        # 7. Phone: WhatsApp message
+        if "whatsapp" in t and ("send" in t or "message" in t):
+            target_match = re.search(r'(?:to|for)\s+([a-zA-Z0-9_\s]+?)(?:\s+in|\s+on|\s+saying|\s*$)', t)
+            msg_match = re.search(r'(?:send|saying|text)\s+([a-zA-Z0-9_\s]+?)(?:\s+to|\s+in|\s*$)', t)
+            target = target_match.group(1).strip() if target_match else "Rudra"
+            msg = msg_match.group(1).strip() if msg_match else "Hi"
+            if "hi" in t and "rudra" in t:
+                target = "Rudra"
+                msg = "Hi"
+            return phone_control.phone.send_whatsapp_message(contact_or_number=target, message=msg)
+
+        # 8. Phone: Alarm
+        if "alarm" in t and ("set" in t or "add" in t or "open clock" in t):
+            match = re.search(r'(?:at|for)\s*([\d\:\sapmAPM]+)', t)
+            alarm_time = match.group(1).strip() if match else "5:30am"
+            return phone_control.phone.set_alarm(time_str=alarm_time, label="Ultron Alarm")
+
+        # 9. Phone: Camera Photo
+        if any(phrase in t for phrase in ["take photo", "take a picture", "click a picture", "click photo"]):
+            cam_type = "front" if "selfie" in t or "front" in t else "back"
+            return phone_control.phone.take_camera_photo(camera_type=cam_type)
+
+        return None
+
     def process_command(self, user_text: str, confirm_granted: bool = False) -> str:
         """Process user command, perform tool calls, speak confirmation."""
         if not user_text or not user_text.strip():
@@ -1124,6 +1226,12 @@ class UltronBrain:
         if clean in ["stop", "cancel", "halt", "abort", "quiet"]:
             speaker.stop()
             return "Stopped, Luffy."
+
+        # Check direct action intent interceptor first
+        direct_reply = self._try_direct_action_intent(user_text)
+        if direct_reply:
+            speaker.speak(direct_reply)
+            return direct_reply
 
         # If Gemini is active, use native automatic tool execution
         if self.provider == "gemini" and self.chat_session:

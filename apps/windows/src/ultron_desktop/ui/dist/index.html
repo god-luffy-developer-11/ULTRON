@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ULTRON — Holographic AI Operator</title>
   <script src="./qwebchannel.js"></script>
-  <script type="module" crossorigin src="./assets/index-BVwebA_c.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-B-3fIj5c.css">
+  <script type="module" crossorigin src="./assets/index-BRu_2Gqx.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-6UFG4yBf.css">
 </head>
 <body>
   <!-- 3D Holographic Three.js Canvas Container -->
@@ -36,12 +36,22 @@
 
   <!-- HUD: Interaction Hint -->
   <div class="hud hud-hint">
-    <div><span class="key">DRAG</span> SPIN&nbsp;&nbsp;<span class="key">SCROLL</span> ZOOM&nbsp;&nbsp;<span class="key">R</span> RESET</div>
-    <div><span class="key">SPACE</span> TOGGLE VOICE&nbsp;&nbsp;<span class="key">+ / -</span> ZOOM</div>
+    <div><span class="key">DRAG / PINCH</span> SPIN&nbsp;&nbsp;<span class="key">SCROLL / SPREAD</span> ZOOM&nbsp;&nbsp;<span class="key">G</span> GESTURES</div>
+    <div><span class="key">SPACE</span> TOGGLE VOICE&nbsp;&nbsp;<span class="key">R</span> RESET&nbsp;&nbsp;<span class="key">+ / -</span> ZOOM</div>
   </div>
 
-  <!-- HUD: Camera & View Controls -->
+  <!-- HUD: Camera & View Controls with Real-time MediaPipe Hand Tracking -->
   <div class="hud hud-controls">
+    <div id="camera-panel" class="camera-panel">
+      <video id="camera-video" muted playsinline class="camera-video"></video>
+      <canvas id="camera-overlay" width="208" height="156" class="camera-overlay"></canvas>
+      <div id="camera-status" class="camera-status">SHOW HANDS</div>
+    </div>
+    <div id="hud-error" class="hud-error" style="display: none;"></div>
+
+    <div class="hud-row">
+      <button type="button" id="btn-gestures" class="hud-btn" aria-pressed="false">GESTURES OFF</button>
+    </div>
     <div class="hud-row">
       <button type="button" id="btn-zoom-in" class="hud-btn" aria-label="Zoom in">+</button>
       <button type="button" id="btn-zoom-out" class="hud-btn" aria-label="Zoom out">−</button>
@@ -49,23 +59,10 @@
     </div>
   </div>
 
-  <!-- HUD: Left Activity & Execution Terminal -->
-  <aside class="hud hud-terminal-container">
-    <div class="terminal-header">
-      <span>// TELEMETRY &amp; OPERATOR TRANSCRIPT</span>
-      <span class="terminal-pulse">● LIVE</span>
-    </div>
-    <div id="hud-terminal" class="terminal-body">
-      <div class="log-row log-system">
-        <span class="log-time">[SYSTEM]</span>
-        <span class="log-msg">Ultron holographic operating system initialized. Ready for instructions, Luffy.</span>
-      </div>
-    </div>
-  </aside>
-
   <!-- HUD: Bottom Command & Control Dock -->
   <footer class="hud hud-bottom-dock">
     <div class="quick-pills">
+      <button type="button" class="quick-pill" data-cmd="open calculator">Open Calculator</button>
       <button type="button" class="quick-pill" data-cmd="open notepad and write essay about AI in 100 words">Open Notepad &amp; Write Essay</button>
       <button type="button" class="quick-pill" data-cmd="check both devices and tell me what is running">Check Both Devices</button>
       <button type="button" class="quick-pill" data-cmd="organize my Downloads folder by file type">Organize Downloads</button>
@@ -81,7 +78,7 @@
         type="text"
         id="command-input"
         class="command-input"
-        placeholder="Ultron, open notepad and write an essay, control PC, or execute mobile tasks..."
+        placeholder="Ultron, open calculator, open notepad and write an essay, control PC, or execute mobile tasks..."
         autocomplete="off"
       />
       <button type="submit" class="hud-btn btn-primary">EXECUTE</button>

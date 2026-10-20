@@ -66,9 +66,9 @@ class Ear:
         is_speaking = False
         silence_chunks = 0
         
-        # 48 chunks = ~1.54 seconds of continuous silence required to signal end of sentence.
-        # This completely prevents premature cutoffs when the user takes a natural breath or pauses between clauses!
-        max_silence_chunks = 48
+        # 22 chunks = ~0.70 seconds of continuous silence required to signal end of sentence.
+        # Fast, responsive turnaround without trailing delay.
+        max_silence_chunks = 22
         
         # Ring buffer of recent 250ms audio so first consonant/syllable is never lost
         pre_buffer = collections.deque(maxlen=8)
@@ -144,15 +144,27 @@ class Ear:
             # Ignore clicks or coughs shorter than 0.35s
             if len(audio_float32) >= int(self.rate * 0.35):
                 try:
-                    # Dynamically transcribe English or Tamil (automatic language detection)
+                    # Dynamically transcribe English or Tamil with Silero VAD filtering
                     segments, info = self.whisper_model.transcribe(
                         audio_float32,
-                        beam_size=1,
+                        beam_size=3,
+                        vad_filter=True,
+                        vad_parameters=dict(min_silence_duration_ms=280),
                         condition_on_previous_text=False
                     )
+
+                    # Only accept English or Tamil to eliminate foreign hallucination artifacts
+                    if info.language not in ("en", "ta"):
+                        print(f" [Filtered noise: {info.language} ({info.language_probability:.2f})]")
+                        return ("TIMEOUT", "")
+
                     transcript = " ".join([s.text for s in segments]).strip()
                     # Filter out empty or hallucinated noise tokens
-                    hallucinations = {"thank you.", "thank you", "thanks for watching.", "thanks for watching", "you", ".", "subtitles by...", "[music]", "bye."}
+                    hallucinations = {
+                        "thank you.", "thank you", "thanks for watching.", "thanks for watching",
+                        "you", ".", "..", "...", "subtitles by...", "[music]", "bye.", "bye",
+                        "thank you for watching.", "okay.", "okay", "yeah.", "yeah"
+                    }
                     if transcript and transcript.lower().strip() not in hallucinations:
                         return ("SPEECH", transcript)
                 except Exception as e:
