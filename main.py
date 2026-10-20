@@ -136,6 +136,14 @@ def on_hotkey_wake():
     set_online_state(True, announce=True)
 
 def main():
+    try:
+        from apps.windows.src.ultron_desktop.app import run_desktop_app
+        run_desktop_app()
+    except Exception as e:
+        console.print(f"[yellow]Could not launch 3D GUI ({e}). Launching console mode...[/yellow]")
+        console_main()
+
+def console_main():
     global voice_listener_running
     console.print(Panel.fit(
         "[bold red]U L T R O N[/bold red]\n"
