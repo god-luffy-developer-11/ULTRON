@@ -79,7 +79,16 @@ Output:
 - Health: `http://127.0.0.1:8000/health`
 - Audit Trail: `http://127.0.0.1:8000/audit`
 
-### 2. Launch ULTRON Voice & Autonomous Assistant
+### 2. Launch ULTRON Holographic 3D Orb UI (Sagar Builds)
+```powershell
+.\run_ultron_ui.bat
+```
+- Iron Man-inspired 3D holographic wireframe particle orb (`Three.js`)
+- MediaPipe hand tracking via webcam (`G` to toggle gestures, pinch to spin/zoom)
+- Live telemetry badges (Backend online, PC CPU/RAM, Android status)
+- Emergency Stop button and interactive command console
+
+### 3. Launch ULTRON Voice & Autonomous Assistant
 ```powershell
 .\run_ultron.bat
 ```

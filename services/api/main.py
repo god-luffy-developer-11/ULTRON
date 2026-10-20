@@ -221,3 +221,44 @@ def reject_approval_ticket(approval_id: str, user: str = "Luffy"):
 @app.get("/audit")
 def get_audit_logs(limit: int = 50, tool_id: Optional[str] = None, decision: Optional[str] = None):
     return audit_logger.query_events(limit=limit, tool_id=tool_id, decision=decision)
+
+class CommandRequest(BaseModel):
+    command: str
+    user: str = "Luffy"
+
+@app.post("/command")
+def execute_command(req: CommandRequest):
+    if emergency_stop.is_active():
+        raise HTTPException(status_code=403, detail="Emergency stop is currently active.")
+    from core.brain import brain
+    reply = brain.process_command(req.command)
+    return {
+        "status": "success",
+        "command": req.command,
+        "reply": reply,
+        "timestamp": time.time()
+    }
+
+@app.get("/system/status")
+def get_system_status():
+    import psutil
+    from tools.pc_control import get_system_info
+    from tools.phone_control import phone
+
+    phone_conn = phone.check_connection()
+    phone_online = "connected" in phone_conn.lower() or "device" in phone_conn.lower()
+
+    return {
+        "emergency_stop": emergency_stop.is_active(),
+        "pc": {
+            "cpu_percent": psutil.cpu_percent(),
+            "ram_percent": psutil.virtual_memory().percent,
+            "info": get_system_info()
+        },
+        "phone": {
+            "connected": phone_online,
+            "status_text": phone_conn
+        },
+        "timestamp": time.time()
+    }
+

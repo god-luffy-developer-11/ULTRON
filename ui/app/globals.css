@@ -1,0 +1,470 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: "Courier New", monospace;
+}
+
+.orb-root {
+  position: fixed;
+  inset: 0;
+  cursor: grab;
+}
+
+.orb-root:active {
+  cursor: grabbing;
+}
+
+.orb-root canvas {
+  display: block;
+}
+
+/* Film grain overlay */
+.overlay-grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 150px;
+  mix-blend-mode: screen;
+}
+
+/* Scanline overlay */
+.overlay-scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 11;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  opacity: 0.3;
+}
+
+/* Vignette */
+.overlay-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 40%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+}
+
+/* ——— HUD ——— */
+.hud {
+  position: fixed;
+  z-index: 20;
+  color: #ffaa30;
+  font-family: "Courier New", monospace;
+  user-select: none;
+}
+
+.hud-controls {
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.hud-btn {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+  background: rgba(20, 10, 0, 0.55);
+  border: 1px solid rgba(255, 170, 48, 0.45);
+  border-radius: 4px;
+  color: #ffaa30;
+  font-family: "Courier New", monospace;
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+  text-shadow: 0 0 6px rgba(255, 170, 48, 0.7);
+  box-shadow: 0 0 12px rgba(255, 140, 20, 0.12) inset;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.hud-btn:hover {
+  background: rgba(60, 30, 0, 0.7);
+  border-color: rgba(255, 200, 100, 0.9);
+  box-shadow:
+    0 0 14px rgba(255, 150, 30, 0.35),
+    0 0 12px rgba(255, 140, 20, 0.2) inset;
+}
+
+.hud-btn:active {
+  background: rgba(90, 45, 0, 0.8);
+}
+
+.hud-btn[aria-pressed="true"] {
+  background: rgba(120, 60, 0, 0.6);
+  border-color: #ffcc66;
+  color: #ffcc66;
+}
+
+.hud-row {
+  display: flex;
+  gap: 8px;
+}
+
+.hud-hint {
+  bottom: 24px;
+  left: 24px;
+  font-size: 11px;
+  line-height: 1.7;
+  letter-spacing: 0.1em;
+  opacity: 0.55;
+  text-shadow: 0 0 8px rgba(255, 170, 48, 0.6);
+  pointer-events: none;
+}
+
+.hud-hint .key {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 170, 48, 0.5);
+  border-radius: 3px;
+  margin-right: 4px;
+  font-size: 10px;
+}
+
+.hud-title {
+  top: 24px;
+  left: 24px;
+  font-size: 13px;
+  letter-spacing: 0.35em;
+  opacity: 0.7;
+  text-shadow: 0 0 10px rgba(255, 170, 48, 0.8);
+  pointer-events: none;
+}
+
+.hud-title::after {
+  content: "";
+  display: block;
+  margin-top: 6px;
+  width: 120px;
+  height: 1px;
+  background: linear-gradient(to right, rgba(255, 170, 48, 0.8), transparent);
+}
+
+.hud-error {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: #ff5533;
+  text-shadow: 0 0 8px rgba(255, 60, 30, 0.7);
+}
+
+/* ——— Camera preview panel ——— */
+.camera-panel {
+  position: relative;
+  width: 208px;
+  height: 156px;
+  display: none;
+  border: 1px solid rgba(255, 170, 48, 0.45);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #0a0500;
+  box-shadow: 0 0 16px rgba(255, 140, 20, 0.15);
+}
+
+.camera-panel.visible {
+  display: block;
+}
+
+.camera-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* mirror so it behaves like a mirror */
+  filter: sepia(1) hue-rotate(-15deg) saturate(2.2) brightness(0.75)
+    contrast(1.15);
+  opacity: 0.85;
+}
+
+.camera-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.camera-status {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 3px 6px;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: #ffcc66;
+  background: rgba(10, 5, 0, 0.65);
+  text-shadow: 0 0 6px rgba(255, 170, 48, 0.8);
+}
+
+@media (max-width: 600px) {
+  .hud-hint {
+    display: none;
+  }
+}
+
+
+/* ——— ULTRON Command Console & Top HUD ——— */
+.hud-header {
+  position: fixed;
+  top: 20px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: auto;
+  z-index: 25;
+}
+
+.hud-badges {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.hud-badge {
+  padding: 4px 10px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  background: rgba(20, 10, 0, 0.65);
+  border: 1px solid rgba(255, 170, 48, 0.4);
+  border-radius: 4px;
+  color: #ffaa30;
+  text-shadow: 0 0 6px rgba(255, 170, 48, 0.7);
+  box-shadow: 0 0 8px rgba(255, 140, 20, 0.1) inset;
+}
+
+.hud-badge.online {
+  border-color: #00ffaa;
+  color: #00ffaa;
+  text-shadow: 0 0 6px rgba(0, 255, 170, 0.8);
+}
+
+.hud-badge.offline {
+  border-color: #ff5533;
+  color: #ff5533;
+  text-shadow: 0 0 6px rgba(255, 85, 51, 0.8);
+}
+
+.hud-estop-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  background: rgba(60, 10, 10, 0.7);
+  border: 1px solid #ff3333;
+  border-radius: 4px;
+  color: #ff5555;
+  cursor: pointer;
+  text-shadow: 0 0 8px rgba(255, 50, 50, 0.8);
+  box-shadow: 0 0 12px rgba(255, 0, 0, 0.25) inset;
+  transition: all 0.2s ease;
+}
+
+.hud-estop-btn:hover {
+  background: rgba(120, 20, 20, 0.85);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(255, 50, 50, 0.6);
+}
+
+.hud-estop-banner {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: rgba(80, 0, 0, 0.9);
+  border: 2px solid #ff3333;
+  padding: 12px 24px;
+  border-radius: 6px;
+  text-align: center;
+  box-shadow: 0 0 24px rgba(255, 0, 0, 0.6);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.hud-estop-banner span {
+  color: #ff9999;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  font-size: 13px;
+}
+
+.hud-resume-btn {
+  padding: 4px 12px;
+  background: #00aa55;
+  border: 1px solid #00ff88;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: inherit;
+}
+
+.hud-console {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  width: min(580px, calc(100vw - 280px));
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.hud-feed {
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(15, 8, 0, 0.7);
+  border: 1px solid rgba(255, 170, 48, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 0 12px rgba(255, 140, 20, 0.08) inset;
+}
+
+.hud-feed::-webkit-scrollbar {
+  width: 4px;
+}
+
+.hud-feed::-webkit-scrollbar-thumb {
+  background: rgba(255, 170, 48, 0.4);
+  border-radius: 2px;
+}
+
+.hud-log-user {
+  color: #ffcc66;
+}
+
+.hud-log-ultron {
+  color: #00ffaa;
+  text-shadow: 0 0 6px rgba(0, 255, 170, 0.5);
+}
+
+.hud-log-sys {
+  color: #ffaa30;
+  opacity: 0.7;
+}
+
+.hud-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.hud-input {
+  flex: 1;
+  height: 42px;
+  padding: 0 12px;
+  background: rgba(20, 10, 0, 0.75);
+  border: 1px solid rgba(255, 170, 48, 0.5);
+  border-radius: 4px;
+  color: #ffcc66;
+  font-family: "Courier New", monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  outline: none;
+  backdrop-filter: blur(3px);
+  box-shadow: 0 0 10px rgba(255, 140, 20, 0.1) inset;
+}
+
+.hud-input:focus {
+  border-color: #ffaa30;
+  box-shadow: 0 0 14px rgba(255, 170, 48, 0.3), 0 0 10px rgba(255, 140, 20, 0.15) inset;
+}
+
+.hud-input::placeholder {
+  color: rgba(255, 170, 48, 0.4);
+}
+
+.hud-transmit-btn {
+  height: 42px;
+  padding: 0 16px;
+  background: rgba(80, 40, 0, 0.65);
+  border: 1px solid #ffaa30;
+  border-radius: 4px;
+  color: #ffcc66;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  text-shadow: 0 0 6px rgba(255, 170, 48, 0.8);
+  transition: all 0.15s ease;
+}
+
+.hud-transmit-btn:hover {
+  background: rgba(120, 60, 0, 0.85);
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(255, 170, 48, 0.5);
+}
+
+.hud-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hud-chip {
+  padding: 3px 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  background: rgba(20, 10, 0, 0.5);
+  border: 1px solid rgba(255, 170, 48, 0.35);
+  border-radius: 3px;
+  color: rgba(255, 170, 48, 0.8);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hud-chip:hover {
+  background: rgba(70, 35, 0, 0.7);
+  border-color: #ffcc66;
+  color: #ffffff;
+}
+
+@media (max-width: 900px) {
+  .hud-console {
+    width: calc(100vw - 48px);
+    bottom: 120px;
+  }
+}

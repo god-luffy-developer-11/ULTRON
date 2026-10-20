@@ -8,6 +8,9 @@ token.txt
 *token*
 
 # Virtual Environments & Caches
+node_modules/
+.next/
+out/
 .venv/
 .venv_jarvis/
 venv/
