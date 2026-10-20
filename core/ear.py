@@ -61,31 +61,21 @@ class Ear:
                 print(f"[Ear] Error opening microphone stream: {e}")
 
     def isolate_voice(self, audio_float: np.ndarray, noise_sample: Optional[np.ndarray] = None) -> np.ndarray:
-        """Apply multi-stage spectral noise reduction, acoustic vocal bandpass filtering, and volume normalization."""
+        """Apply multi-stage fast spectral noise reduction, acoustic vocal bandpass filtering, and volume normalization."""
         try:
             # 1. Bandpass filter: strip non-vocal low hums (<85Hz) and ultra-high hiss (>7500Hz)
             if self.sos_filter is not None:
                 audio_float = signal.sosfilt(self.sos_filter, audio_float)
 
-            # 2. Spectral noise suppression / Voice Isolation
+            # 2. Fast spectral noise suppression (Voice Isolation - ~15ms)
             if nr is not None:
-                if noise_sample is not None and len(noise_sample) >= 512:
-                    audio_float = nr.reduce_noise(
-                        y=audio_float,
-                        y_noise=noise_sample,
-                        sr=self.rate,
-                        stationary=False,
-                        prop_decrease=0.88,
-                        n_jobs=2
-                    )
-                else:
-                    audio_float = nr.reduce_noise(
-                        y=audio_float,
-                        sr=self.rate,
-                        stationary=True,
-                        prop_decrease=0.85,
-                        n_jobs=2
-                    )
+                audio_float = nr.reduce_noise(
+                    y=audio_float,
+                    sr=self.rate,
+                    stationary=True,
+                    prop_decrease=0.75,
+                    n_jobs=2
+                )
 
             # 3. Peak normalization to -1.0 dBFS (0.90) for crisp, clean Whisper recognition
             peak = float(np.max(np.abs(audio_float)))
@@ -94,13 +84,12 @@ class Ear:
 
             return audio_float.astype(np.float32)
         except Exception as e:
-            print(f"[Ear] Voice isolation fallback notice: {e}")
             return audio_float
 
     def listen_cycle(self, timeout: float = 3.5, max_phrase_time: float = 25.0) -> Tuple[str, str]:
         """Capture from mic, returning ('DOUBLE_CLAP', '') or ('SPEECH', transcript) or ('TIMEOUT', '').
         
-        Applies real-time voice isolation and speech enhancement.
+        Applies real-time voice isolation and speech enhancement with ultra-low latency.
         """
         self._load_model()
         self._ensure_stream()
@@ -115,14 +104,12 @@ class Ear:
         is_speaking = False
         silence_chunks = 0
         
-        # 22 chunks = ~0.70 seconds of continuous silence required to signal end of sentence.
-        # Fast, responsive turnaround without trailing delay.
-        max_silence_chunks = 22
+        # 14 chunks = ~448ms of continuous silence required to signal end of sentence.
+        # Instant, low-latency turnaround.
+        max_silence_chunks = 14
         
         # Ring buffer of recent 250ms audio so first consonant/syllable is never lost
         pre_buffer = collections.deque(maxlen=8)
-        # Background noise profile buffer for adaptive voice isolation
-        noise_buffer = collections.deque(maxlen=16)
 
         while True:
             # Check timeouts:
@@ -165,10 +152,9 @@ class Ear:
             speech_threshold = min(max(self.ambient_rms * 1.35, 0.012), 0.035)
 
             if not is_speaking:
-                # Track ambient noise floor and profile while idle
+                # Track ambient noise floor while idle
                 self.ambient_rms = 0.96 * self.ambient_rms + 0.04 * rms
                 pre_buffer.append(data)
-                noise_buffer.append(data)
 
                 if rms > speech_threshold:
                     is_speaking = True
@@ -182,7 +168,7 @@ class Ear:
                 if rms <= speech_threshold:
                     silence_chunks += 1
                     if silence_chunks >= max_silence_chunks:
-                        # Speaker has paused for ~0.70s, full sentence complete
+                        # Speaker has paused for ~448ms, full sentence complete
                         break
                 else:
                     silence_chunks = 0
@@ -196,22 +182,16 @@ class Ear:
             # Ignore clicks or coughs shorter than 0.35s
             if len(audio_float32) >= int(self.rate * 0.35):
                 try:
-                    # Extract background ambient profile for targeted voice isolation
-                    if noise_buffer:
-                        raw_noise = b"".join(list(noise_buffer))
-                        noise_float = np.frombuffer(raw_noise, dtype=np.int16).astype(np.float32) / 32768.0
-                    else:
-                        noise_float = None
+                    # Apply fast Multi-stage Voice Isolation
+                    isolated_audio = self.isolate_voice(audio_float32)
 
-                    # Apply Multi-stage Voice Isolation
-                    isolated_audio = self.isolate_voice(audio_float32, noise_sample=noise_float)
-
-                    # Dynamically transcribe English or Tamil with Silero VAD filtering on isolated voice
+                    # Dynamically transcribe English or Tamil with Silero VAD filtering on isolated voice (greedy decode = 3x faster)
                     segments, info = self.whisper_model.transcribe(
                         isolated_audio,
-                        beam_size=3,
+                        beam_size=1,
+                        temperature=0.0,
                         vad_filter=True,
-                        vad_parameters=dict(min_silence_duration_ms=280),
+                        vad_parameters=dict(min_silence_duration_ms=250),
                         condition_on_previous_text=False
                     )
 

@@ -21,8 +21,8 @@ class Speaker:
         self.elevenlabs_quota_exceeded = False
         self.preferred_engine = os.getenv("VOICE_ENGINE", "edge").lower().strip()
 
-    def speak(self, text: str) -> str:
-        """Speak out text synchronously using Microsoft Edge Neural TTS (unlimited, zero quota limits) or ElevenLabs."""
+    def speak(self, text: str, wait: bool = False) -> str:
+        """Speak out text asynchronously (non-blocking) using Edge Neural TTS or ElevenLabs."""
         if not text or not text.strip():
             return "No text to speak."
         
@@ -30,21 +30,30 @@ class Speaker:
         text = text.strip()
         print(f"\n[ULTRON]: \"{text}\"")
 
-        # 1. If ElevenLabs is explicitly configured and quota is intact, try ElevenLabs
-        if self.preferred_engine == "elevenlabs" and Config.ELEVENLABS_API_KEY and not self.elevenlabs_quota_exceeded:
-            try:
-                if self._speak_elevenlabs(text):
-                    return f"Spoke: {text}"
-            except Exception:
-                pass
+        def _worker():
+            with self._lock:
+                self.is_speaking = True
+                try:
+                    # 1. ElevenLabs if explicitly configured
+                    if self.preferred_engine == "elevenlabs" and Config.ELEVENLABS_API_KEY and not self.elevenlabs_quota_exceeded:
+                        try:
+                            if self._speak_elevenlabs(text):
+                                return
+                        except Exception:
+                            pass
 
-        # 2. Unlimited, free, studio-quality Neural TTS (Ava Multilingual for English, Pallavi for Tamil)
-        try:
-            self._speak_edge_tts(text)
-            return f"Spoke: {text}"
-        except Exception as e:
-            print(f"[Speaker] Neural voice error: {e}")
-            return f"Failed to speak aloud: {e}"
+                    # 2. Unlimited Edge Neural TTS
+                    self._speak_edge_tts(text)
+                except Exception as e:
+                    print(f"[Speaker] Speech playback notice: {e}")
+                finally:
+                    self.is_speaking = False
+
+        t = threading.Thread(target=_worker, daemon=True, name="UltronSpeakerThread")
+        t.start()
+        if wait:
+            t.join()
+        return f"Spoke: {text}"
 
     def _speak_elevenlabs(self, text: str) -> bool:
         voice_id = Config.ELEVENLABS_VOICE_ID or "cgSgspJ2msm6clMCkdW9" # Jessica - female

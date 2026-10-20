@@ -65,6 +65,9 @@ export class HandTracker {
   private prevSpinGrab: Point | null = null;
   private prevZoomDist: number | null = null;
   private lastStatus: TrackerStatus = { hands: 0, mode: "idle" };
+  private lastInferenceTime = 0;
+  private readonly TARGET_FPS = 25;
+  private readonly FRAME_INTERVAL = 1000 / 25; // 40ms interval (25 FPS max) prevents CPU thread starvation
 
   constructor(
     video: HTMLVideoElement,
@@ -180,13 +183,23 @@ export class HandTracker {
     if (!this.running) return;
     this.rafId = requestAnimationFrame(this.loop);
 
+    const now = performance.now();
+    if (now - this.lastInferenceTime < this.FRAME_INTERVAL) {
+      return;
+    }
+    this.lastInferenceTime = now;
+
     if (!this.landmarker || this.video.readyState < 2) return;
     if (this.video.currentTime === this.lastVideoTime) return;
     this.lastVideoTime = this.video.currentTime;
 
-    const result = this.landmarker.detectForVideo(this.video, performance.now());
-    this.processHands(result.landmarks, result.handedness.map((h) => h[0]?.categoryName ?? "?"));
-    this.drawOverlay(result.landmarks);
+    try {
+      const result = this.landmarker.detectForVideo(this.video, now);
+      this.processHands(result.landmarks, result.handedness.map((h) => h[0]?.categoryName ?? "?"));
+      this.drawOverlay(result.landmarks);
+    } catch {
+      // Ignore frame drop gracefully
+    }
   };
 
   private processHands(

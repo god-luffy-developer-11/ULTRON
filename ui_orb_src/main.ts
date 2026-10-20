@@ -191,7 +191,10 @@ function showToast(message: string) {
   }, 3500);
 }
 
+let lastState = "";
 function setStatus(state: string) {
+  if (state === lastState) return;
+  lastState = state;
   const badge = document.getElementById("state-badge");
   if (badge) {
     badge.textContent = state;
